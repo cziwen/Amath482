@@ -215,15 +215,18 @@ def fft_3d_filter (data, cutoff_frequency):
     return filtered_data
 
 
-def process_frequency_data(data, cutoff_frequency):
+def process_frequency_data(data, cutoff_frequency, g_bw):
     """
     先将数据转换到频域，先进行高频过滤（低通滤波），然后再对时间维度平均以提取主频率。
+    同时对频率进行 shift 操作，以便更直观地观察频域结果。
 
     Parameters:
     - data: np.ndarray
         输入 4D 数据，形状为 (n, n, n, t)。
     - cutoff_frequency: float
-        低通滤波器的截止频率，范围为 [0, 0.5)。
+        低通滤波器的截止频率，会过滤掉所有大于该频率的数据
+    - g_bw: float
+        高斯过滤 bandwidth，越大过滤的信息越多
 
     Returns:
     - filtered_data: np.ndarray
@@ -239,26 +242,33 @@ def process_frequency_data(data, cutoff_frequency):
 
     # Step 1: 转换到频域
     fft_data = np.fft.fftn(data, axes=(0, 1, 2))  # 对空间轴做傅里叶变换
+    fft_data = np.fft.fftshift(fft_data, axes=(0, 1, 2))  # 频率 shift
 
-    # Step 2: 创建频率网格
-    freq_x = np.fft.fftfreq(n_x)
-    freq_y = np.fft.fftfreq(n_y)
-    freq_z = np.fft.fftfreq(n_z)
+    # Step 2: 创建频率网格（shift 后的频率）
+    freq_x = np.fft.fftshift(np.fft.fftfreq(n_x))
+    freq_y = np.fft.fftshift(np.fft.fftfreq(n_y))
+    freq_z = np.fft.fftshift(np.fft.fftfreq(n_z))
     freq_x, freq_y, freq_z = np.meshgrid(freq_x, freq_y, freq_z, indexing='ij')
-    freq_magnitude = np.sqrt(freq_x**2 + freq_y**2 + freq_z**2)
 
-    # Step 3: 高频过滤（低通滤波）
+    # Step 3: 基于频率范围的低通滤波
+    freq_magnitude = np.sqrt(freq_x**2 + freq_y**2 + freq_z**2)
     filter_mask = freq_magnitude <= cutoff_frequency
     fft_data_filtered = fft_data * filter_mask[..., np.newaxis]  # 应用到所有时间切片
 
-    # Step 4: 时间维度平均
-    fft_avg = np.mean(np.abs(fft_data_filtered), axis=3)  # 对时间轴取平均，得到 3D 频谱
+    # Step 4: 高斯滤波
+    k_squared = freq_x**2 + freq_y**2 + freq_z**2  # 已经shift过，所以可以默认k_0 = 0
+    gaussian_filter = np.exp(-g_bw * k_squared)
+    fft_data_filtered = fft_data_filtered * gaussian_filter[..., np.newaxis]
 
-    # Step 5: 提取主频率
+    # Step 5: 时间维度平均（降噪）
+    fft_avg = np.mean(np.abs(fft_data_filtered), axis=3)  # 对时间轴取平均（顺便取 magnitude），得到 3D 频谱
+
+    # Step 6: 提取主频率
     dominant_index = np.unravel_index(np.argmax(fft_avg), fft_avg.shape)
     dominant_frequency = (freq_x[dominant_index], freq_y[dominant_index], freq_z[dominant_index])
 
-    # Step 6: 回到空间域
+    # Step 7: 回到空间域
+    fft_data_filtered = np.fft.ifftshift(fft_data_filtered, axes=(0, 1, 2))  # 将频率移回原始顺序
     filtered_data = np.fft.ifftn(fft_data_filtered, axes=(0, 1, 2)).real  # 转换回空间域
 
     return filtered_data, dominant_frequency
@@ -288,10 +298,10 @@ def create_isosurface_gif(data, isovalue, gif_filename, fps=10):
     n_x, n_y, n_z, n_t = data.shape
 
     # Create a meshgrid for spatial dimensions
-    x = np.linspace(0, n_x - 1, n_x)
-    y = np.linspace(0, n_y - 1, n_y)
-    z = np.linspace(0, n_z - 1, n_z)
-    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+    # x = np.linspace(0, n_x - 1, n_x)
+    # y = np.linspace(0, n_y - 1, n_y)
+    # z = np.linspace(0, n_z - 1, n_z)
+    # X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
 
     # Create a list to store frames for the GIF
     frames = []
@@ -349,7 +359,7 @@ def create_isosurface_gif(data, isovalue, gif_filename, fps=10):
 
 
 # filtered_data = fft_3d_filter(data.reshape(64, 64, 64, 49), 0.5)
-filtered_data, dominant_frequency = process_frequency_data(data.reshape(64,64,64,49), 0.5)
+filtered_data, dominant_frequency = process_frequency_data(data.reshape(64,64,64,49), 0.55, 0.85)
 print(dominant_frequency)
 create_isosurface_gif(filtered_data, isovalue=0.5, gif_filename="filtered_Data.gif")
 create_isosurface_gif(data.reshape(64, 64, 64, 49), isovalue=0.5, gif_filename="original_Data.gif")
