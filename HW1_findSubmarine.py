@@ -1,13 +1,10 @@
 # ziwen chen
 # zchen56
-import os
-from venv import create
 
 import imageio
 import numpy as np
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
-from numpy.matlib import empty
 from skimage import measure  # 用于提取等值面
 
 # 获得数据
@@ -373,8 +370,8 @@ filtered_data, dominant_frequency, dominant_index, spatial_path = process_freque
                                                                                           0.55, 0.85)
 
 
-# create_isosurface_gif(filtered_data, isovalue=0.5, gif_filename="filtered_Data.gif")
-# create_isosurface_gif(data.reshape(64, 64, 64, 49), isovalue=0.5, gif_filename="original_Data.gif")
+create_isosurface_gif(filtered_data, isovalue=0.5, gif_filename="filtered_Data.gif")
+create_isosurface_gif(data.reshape(64, 64, 64, 49), isovalue=0.5, gif_filename="original_Data.gif")
 
 
 # ------------------------------------------------------------------------------
@@ -453,4 +450,6 @@ def plot_spatial_path_xy(spatial_path):
 
 plot_spatial_path_3D (spatial_path)
 plot_spatial_path_xy (spatial_path)
+
+
 
