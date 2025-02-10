@@ -3,9 +3,10 @@ from pyexpat.model import XML_CTYPE_EMPTY
 
 import numpy as np
 import matplotlib.pyplot as plt
+from networkx.classes import neighbors
 from sklearn.decomposition import PCA
-from sklearn import preprocessing
 from sklearn.metrics import accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
 
 
 # ================================
@@ -259,7 +260,7 @@ def centroid_classifier_accuracy (k, X_projected, y_train):
 k_values = [1, 2, 3, 5, 7, 10, 15, 20, 30]  # 可根据需要自行扩展
 
 # 3) 测试
-print("\n===测试在不同k下，trained data 的 classify 准确率===")
+print ("\n===测试在不同k下，trained data 的 classify 准确率===")
 best_acc = 0.0
 best_k = None
 for k in k_values:
@@ -273,7 +274,7 @@ print ("\nBest accuracy = {:.4f} at k = {}".format (best_acc, best_k))
 
 
 # ================================
-# ============ Task 4 ============
+# ============ Task 5 ============
 # ================================
 
 def centroid_classifier_accuracy (k, X_test_projected, X_train_projected, y_test_train, y_train):
@@ -326,7 +327,7 @@ y_test_train[100:200] = 1
 y_test_train[200:300] = 2
 
 # 3) 测试准确率
-print("\n===测试在不同k下，给新样本分类的准确率===")
+print ("\n===测试在不同k下，给新样本分类的准确率===")
 best_acc = 0.0
 best_k = None
 for k in k_values:
@@ -337,3 +338,67 @@ for k in k_values:
         best_k = k
 
 print ("\nBest accuracy = {:.4f} at k = {}".format (best_acc, best_k))
+
+
+# ================================
+# ============ Task 6 ============
+# ================================
+
+def knn_classifier_accuracy (k, X_test_projected, X_train_projected, y_test_train, y_train, n_neighbors=5):
+    """
+    输入:
+        k: 保留的 PCA 主成分数
+        X_test_projected: shape=(n,114)，n 为 总帧数 ,已在PCA空间
+        X_train_projected: shape = (N,114) N 为 总帧数，已在PCA空间
+        y_test_train: shape=(n,), 每个样本对应的真实标签(0,1,2)，0=walking, 1=jumping, 2=running
+        y_train: shape(N,), 每个样本对应的真实标签(0,1,2)，0=walking, 1=jumping, 2=running
+        n_neighbors: 选择的最近邻个数 (默认 k=5)
+
+    返回:
+        accuracy: float, 该 k 值下用 k-NN 分类得到的准确率
+    """
+    # 截取 X_train 和 X_test 前 k 个主成分
+    X_train_k = X_train_projected[:, :k]  # (N, k)
+    X_test_k = X_test_projected[:, :k]  # (n, k)
+
+    # --------------- 训练 k-NN 分类器 ---------------
+    knn = KNeighborsClassifier (n_neighbors=n_neighbors)  # 选择最近邻个数
+    knn.fit (X_train_k, y_train)
+
+    # --------------- 对测试样本进行预测 ---------------
+    y_pred = knn.predict (X_test_k)
+
+    # --------------- 计算准确率 ---------------
+    acc = accuracy_score (y_test_train, y_pred)
+    return acc
+
+
+print ("\n===测试在不同k和n_neighbor下，给knn给新样本的分类的准确率===")
+print ("\n---每次打印在当前k下，准确率最高的 n_neighbor 和其准确率---")
+max_n_neighbors = 50
+best_acc = 0.0
+best_k = None
+best_n_neighbors = None
+for k in k_values:
+
+    best_acc_current = 0.0
+    best_k_current = None
+    best_n_neighbors_current = None
+
+    for n_neighbors in range (1, max_n_neighbors + 1):
+        acc = knn_classifier_accuracy (k, X_test_projected, X_projected, y_test_train, y_train)
+        # 更新当前k下最高的准确率和neighbor
+        if acc > best_acc_current:
+            best_acc_current = acc
+            best_k_current = k
+            best_n_neighbors_current = n_neighbors
+
+    # 更新全局最高的准确率和neighbor
+    if best_acc_current > best_acc:
+        best_acc = best_acc_current
+        best_k = best_k_current
+        best_n_neighbors = best_n_neighbors_current
+
+    print (f"k={best_k_current}, n_neighbors={best_n_neighbors_current}, accuracy={best_acc_current:.6f}")
+
+print ("\nBest accuracy = {:.4f} at k = {}, n_neighbors = {}".format (best_acc, best_k, best_n_neighbors))
