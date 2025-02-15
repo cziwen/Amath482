@@ -4,6 +4,7 @@ from pyexpat.model import XML_CTYPE_EMPTY
 import numpy as np
 import matplotlib.pyplot as plt
 from networkx.classes import neighbors
+from numpy import dtype
 from sklearn.decomposition import PCA
 from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
@@ -112,9 +113,6 @@ plt.show ()
 #    X_centered_T = X_train_centered.T
 #    pca = PCA()
 #    X_projected = pca.fit_transform (X_centered_T)
-
-# 2. 获取投影系数 (1500, 114)，每一行对应时间帧，每一列对应某个主成分
-# X_projected = pca.transform(X_centered_T)  # (1500, 114)
 
 # 3. 提取前2个主成分、前3个主成分
 X_pc2 = X_projected[:, :2]  # 仅保留PC1, PC2   (1500, 2)
@@ -239,7 +237,8 @@ def centroid_classifier_accuracy (k, X_projected, y_train):
         class_data = X_k[y_train == c]  # 取出第 c 类
         centroid_c = np.mean (class_data, axis=0)  # shape=(k,)
         centroids.append (centroid_c)
-    centroids = np.array (centroids)  # shape=(3,k)
+    centroids = np.array(centroids, dtype=np.float64)  # 强制转换数据类型，确保精度一致 shape=(3,k)
+
 
     # --------------- 对每个样本做分类预测 ---------------
     #   算与 3 个质心的欧氏距离, 选最近者
@@ -257,10 +256,10 @@ def centroid_classifier_accuracy (k, X_projected, y_train):
 
 
 # 2) 在多个 k 值下重复此流程
-k_values = [1, 2, 3, 5, 7, 10, 15, 20, 30]  # 可根据需要自行扩展
+k_values = [1, 2, 3, 5, 7, 10, 14, 18, 24, 30]  # 可根据需要自行扩展
 
 # 3) 测试
-print ("\n===测试在不同k下，trained data 的 classify 准确率===")
+print ("\n===测试在不同k下的 centroid of train data 预测train data 自己的准确率===")
 best_acc = 0.0
 best_k = None
 for k in k_values:
@@ -290,7 +289,7 @@ def centroid_classifier_accuracy (k, X_test_projected, X_train_projected, y_test
     """
     # 截取 X_train 和 X_test 前 k 个主成分
     X_train_k = X_train_projected[:, :k]  # (N, k)
-    X_test_k = X_test_projected[:, :k]  # (N, k)
+    X_test_k = X_test_projected[:, :k]  # (n, k)
 
     # --------------- 计算 X_train 的各类运动在 k维空间的质心 ---------------
     centroids_X_train = []
@@ -299,7 +298,7 @@ def centroid_classifier_accuracy (k, X_test_projected, X_train_projected, y_test
         class_data = X_train_k[y_train == c]  # 取出第 c 类
         centroid_c = np.mean (class_data, axis=0)  # shape=(k,)
         centroids_X_train.append (centroid_c)
-    centroids_X_train = np.array (centroids_X_train)  # shape=(3,k)
+    centroids_X_train = np.array (centroids_X_train, dtype=np.float64)  # shape=(3,k)
 
     # --------------- 对每个样本做分类预测，用 训练好的质心 来给 新样本分类 ---------------
     y_pred = []
@@ -317,8 +316,7 @@ def centroid_classifier_accuracy (k, X_test_projected, X_train_projected, y_test
 
 # 1) 导入数据，进行pca
 X_test = load_test_data ()  # (114, 300)
-pca = PCA ()
-X_test_projected = pca.fit_transform (X_test.T)  # (300, 114)
+X_test_projected = pca.transform(X_test.T)  # 得到 shape=(300,114)
 
 # 2） 创建label    0=walking, 1=jumping, 2=running
 y_test_train = np.zeros (300, dtype=int)
@@ -373,9 +371,41 @@ def knn_classifier_accuracy (k, X_test_projected, X_train_projected, y_test_trai
     return acc
 
 
+print ("\n===测试在不同k和n_neighbor下，给knn给train Data的分类的准确率===")
+print ("\n---每次打印在当前k下，准确率最高的 n_neighbor 和其准确率---")
+max_n_neighbors = 10
+best_acc = 0.0
+best_k = None
+best_n_neighbors = None
+for k in k_values:
+
+    best_acc_current = 0.0
+    best_k_current = None
+    best_n_neighbors_current = None
+
+    for n_neighbors in range (1, max_n_neighbors + 1):
+        acc = knn_classifier_accuracy (k, X_projected, X_projected, y_train, y_train)
+        # 更新当前k下最高的准确率和neighbor
+        if acc > best_acc_current:
+            best_acc_current = acc
+            best_k_current = k
+            best_n_neighbors_current = n_neighbors
+
+    # 更新全局最高的准确率和neighbor
+    if best_acc_current > best_acc:
+        best_acc = best_acc_current
+        best_k = best_k_current
+        best_n_neighbors = best_n_neighbors_current
+
+    print (f"k={best_k_current}, n_neighbors={best_n_neighbors_current}, accuracy={best_acc_current:.6f}")
+
+print ("\nBest accuracy = {:.4f} at k = {}, n_neighbors = {}".format (best_acc, best_k, best_n_neighbors))
+
+
+
 print ("\n===测试在不同k和n_neighbor下，给knn给新样本的分类的准确率===")
 print ("\n---每次打印在当前k下，准确率最高的 n_neighbor 和其准确率---")
-max_n_neighbors = 50
+max_n_neighbors = 10
 best_acc = 0.0
 best_k = None
 best_n_neighbors = None
@@ -402,3 +432,6 @@ for k in k_values:
     print (f"k={best_k_current}, n_neighbors={best_n_neighbors_current}, accuracy={best_acc_current:.6f}")
 
 print ("\nBest accuracy = {:.4f} at k = {}, n_neighbors = {}".format (best_acc, best_k, best_n_neighbors))
+
+
+
