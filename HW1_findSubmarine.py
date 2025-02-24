@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from skimage import measure  # 用于提取等值面
 
 # 获得数据
-file_path = "HW1 DATA/subdata.npy"
+file_path = "hw1data/subdata.npy"
 data = np.load (file_path)
 print ("数据形状: ", data.shape)
 # print("数据类型: ", data.dtype)

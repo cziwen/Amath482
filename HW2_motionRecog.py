@@ -1,10 +1,7 @@
 # ziwen chen, zchen56
-from pyexpat.model import XML_CTYPE_EMPTY
 
 import numpy as np
 import matplotlib.pyplot as plt
-from networkx.classes import neighbors
-from numpy import dtype
 from sklearn.decomposition import PCA
 from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
