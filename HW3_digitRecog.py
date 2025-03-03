@@ -163,34 +163,125 @@ from sklearn.linear_model import RidgeClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score
 
+
+def ridge_Classify (k=59, digits=[1, 2, 3, 4, 5, 6, 7, 8, 9, 0], cross_val=False):
+    '''
+    使用原始数据计算新的PCA（主成分），
+    再使用指定数字的数据集映射他们到 主成分维度
+    由此 训练 ridge classifier 并对测试集验证（包含交叉验证） 打印其分数
+    :param k: PCA 选择使用的主成分数量
+    :param digits: 需要进行classify的数字
+    '''
+    X_subtrain, y_subtrain, X_subtest, y_subtest = select_digit_subset (Xtraindata, ytrainlabels, Xtestdata,
+                                                                        ytestlabels,
+                                                                        digits)
+
+    # print("Shapes of extracted data:")
+    # print("X_subtrain:", X_subtrain.shape, "y_subtrain:", y_subtrain.shape)
+    # print("X_subtest:",  X_subtest.shape,  "y_subtest:",  y_subtest.shape)
+
+    # Apply PCA
+    pca = PCA (n_components=k)
+    pca.fit (Xtraindata.T)  # 用原始的 数据 计算主成分
+    X_train_pca = pca.transform (X_subtrain.T)
+    X_test_pca = pca.transform (X_subtest.T)
+    # Train Ridge classifier
+    ridge_clf = RidgeClassifier ()
+    ridge_clf.fit (X_train_pca, y_subtrain)
+    # cross validation
+    cv_scores = cross_val_score (ridge_clf, X_train_pca, y_subtrain, cv=5)
+    # Predict and evaluate
+    y_pred_train = ridge_clf.predict (X_train_pca)
+    y_pred_test = ridge_clf.predict (X_test_pca)
+    train_acc = accuracy_score (y_subtrain, y_pred_train)  # 也可以使用 ridge_clf.score
+    test_acc = accuracy_score (y_subtest, y_pred_test)
+    print (f"\n==================== Rdige Classification on digits: {digits} ====================")
+    if cross_val:
+        print (f"Cross Validation scores: {cv_scores} ")
+        print (f"Cross Validation mean score: {np.mean (cv_scores): .4f}")
+    print (f"Train Accuracy: {train_acc:.4f}")
+    print (f"Test Accuracy: {test_acc:.4f}")
+
+
 # Select digits 1 and 8
-X_subtrain, y_subtrain, X_subtest, y_subtest = select_digit_subset (Xtraindata, ytrainlabels, Xtestdata, ytestlabels,
-                                                                    [1, 8])
+ridge_Classify (k=59, digits=[1, 8], cross_val=True)
 
-print("Shapes of extracted data:")
-print("X_subtrain:", X_subtrain.shape, "y_subtrain:", y_subtrain.shape)
-print("X_subtest:",  X_subtest.shape,  "y_subtest:",  y_subtest.shape)
+# ==================== Task 5: Compare results ====================
 
-# Apply PCA
-pca = PCA(n_components=k)
-pca.fit(Xtraindata.T) # 用原始的data计算主成分
-X_train_pca = pca.transform (X_subtrain.T)
-X_test_pca = pca.transform (X_subtest.T)
+# 在 3，8 上验证
+ridge_Classify (k=59, digits=[3, 8], cross_val=True)
 
-# Train Ridge classifier
-ridge_clf = RidgeClassifier ()
-ridge_clf.fit (X_train_pca, y_subtrain)
+# 在 2，7 上验证
+ridge_Classify (k=59, digits=[2, 7], cross_val=True)
 
-# cross validation
-cv_scores = cross_val_score (ridge_clf, X_train_pca, y_subtrain, cv=5)
+# ==================== Task 6: Use all digits, compare result with ridge and knn ====================
 
-# Predict and evaluate
-y_pred_train = ridge_clf.predict (X_train_pca)
-y_pred_test = ridge_clf.predict (X_test_pca)
+from sklearn.neighbors import KNeighborsClassifier
 
-train_acc = accuracy_score (y_subtrain, y_pred_train)
-test_acc = accuracy_score (y_subtest, y_pred_test)
 
-print (f"Cross Validation Accuracy: {train_acc: .4f}")
-print (f"Train Accuracy: {train_acc:.4f}")
-print (f"Test Accuracy: {test_acc:.4f}")
+# KNN Classifier
+def knn_Classify (k=59, digits=[1, 2, 3, 4, 5, 6, 7, 8, 9, 0], n_neighbors=5):
+    X_subtrain, y_subtrain, X_subtest, y_subtest = select_digit_subset (Xtraindata, ytrainlabels, Xtestdata,
+                                                                        ytestlabels, digits)
+
+    # Apply PCA
+    pca = PCA (n_components=k)
+    pca.fit (Xtraindata.T)
+    X_train_pca = pca.transform (X_subtrain.T)
+    X_test_pca = pca.transform (X_subtest.T)
+
+
+    # Train KNN classifier
+    knn_clf = KNeighborsClassifier (n_neighbors=n_neighbors)
+    knn_clf.fit (X_train_pca, y_subtrain)
+
+    # Predict and evaluate
+    y_pred_train = knn_clf.predict (X_train_pca)
+    y_pred_test = knn_clf.predict (X_test_pca)
+
+    train_acc = accuracy_score (y_subtrain, y_pred_train)  # 可用 knn.score
+    test_acc = accuracy_score (y_subtest, y_pred_test)
+
+    print (f"\n==================== KNN Classification (k={n_neighbors}) on digits: {digits} ====================")
+    print (f"Train Accuracy: {train_acc:.4f}")
+    print (f"Test Accuracy: {test_acc:.4f}")
+    print ()
+
+
+# 对比效果
+ridge_Classify (k=59)
+knn_Classify (k=59, n_neighbors=5)
+
+# ==================== Task7: optional svm ====================
+
+from sklearn.svm import SVC
+
+
+def svm_Classify (k=59, digits=[1, 2, 3, 4, 5, 6, 7, 8, 9, 0]):
+    X_subtrain, y_subtrain, X_subtest, y_subtest = select_digit_subset (Xtraindata, ytrainlabels, Xtestdata,
+                                                                        ytestlabels, digits)
+
+    # Apply PCA
+    pca = PCA (n_components=k)
+    pca.fit (Xtraindata.T)  # 计算 PCA
+    X_train_pca = pca.transform (X_subtrain.T) # 映射
+    X_test_pca = pca.transform (X_subtest.T)
+
+    # Train SVM classifier
+    svm_clf = SVC (kernel='rbf')  # 这用 RBF 核函数，也可以使用 'linear' 或 'poly'
+    svm_clf.fit (X_train_pca, y_subtrain)
+
+    # Predict and evaluate
+    y_pred_train = svm_clf.predict (X_train_pca)
+    y_pred_test = svm_clf.predict (X_test_pca)
+
+    train_acc = accuracy_score (y_subtrain, y_pred_train) # svm_clf.score 也行
+    test_acc = accuracy_score (y_subtest, y_pred_test)
+
+    print (f"\n==================== SVM Classification on digits: {digits} ====================")
+    print (f"Train Accuracy: {train_acc:.4f}")
+    print (f"Test Accuracy: {test_acc:.4f}")
+
+
+# Run SVM
+svm_Classify (k=59)
