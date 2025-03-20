@@ -3,6 +3,8 @@ import torch
 from torch import nn
 import tqdm
 
+import time
+
 import torchvision
 import matplotlib.pyplot as plt
 from torch.optim import RMSprop
@@ -43,8 +45,6 @@ mnist_train_indices, mnist_val_indices, _, _ = train_test_split (
     test_size=0.1
 )
 
-
-
 # 生成训练 & 验证集的子集
 fashion_train_split = Subset (fashion_train_dataset, train_indices)
 fashion_val_split = Subset (fashion_train_dataset, val_indices)
@@ -64,6 +64,7 @@ fashion_test_batches = DataLoader (fashion_test_dataset, batch_size=test_batch_s
 mnist_train_batches = DataLoader (mnist_train_split, batch_size=train_batch_size, shuffle=True)
 mnist_val_batches = DataLoader (mnist_val_split, batch_size=train_batch_size, shuffle=True)
 mnist_test_batches = DataLoader (mnist_test_dataset, batch_size=test_batch_size, shuffle=True)
+
 
 # 打印 batch 数量
 # num_fashion_train_batches = len (fashion_train_batches)
@@ -252,10 +253,12 @@ def plot_accuracy_curves (accuracy_curve_dict):
 
 
 # ============ Base Line Config
-def train_validate (num_epochs=20, lr=0.1, optimizer=None, init_method=None, norm_method=None, dropout=0.0, train_batch=fashion_train_batches, validate_batch=fashion_val_batches, test_batch=fashion_test_batches):
+def train_validate (num_epochs=20, hidden_dim=[112, 96], lr=0.1, optimizer=None, init_method=None, norm_method=None,
+                    dropout=0.0, train_batch=fashion_train_batches, validate_batch=fashion_val_batches,
+                    test_batch=fashion_test_batches):
     model = ACAIGFCN (
         input_dim=784,
-        hidden_dim=[512, 256, 128],
+        hidden_dim=hidden_dim,
         output_dim=10,
         learning_rate=lr,
         dropout_rate=dropout,
@@ -264,13 +267,17 @@ def train_validate (num_epochs=20, lr=0.1, optimizer=None, init_method=None, nor
         normalization=norm_method
     )
 
+    start_time = time.time()
     loss_curve, acc_curve = model.train_model (train_batch, num_epochs=num_epochs,
                                                validate_batches=validate_batch)
+
+    end_time = time.time()
+    time_usage = end_time - start_time
 
     val_acc = model.validate_model (validate_batch)
     test_acc = model.validate_model (test_batch)
 
-    return val_acc, test_acc, loss_curve, acc_curve
+    return val_acc, test_acc, loss_curve, acc_curve, time_usage
 
 
 # ============================= baseline =======================
@@ -412,49 +419,51 @@ def train_validate (num_epochs=20, lr=0.1, optimizer=None, init_method=None, nor
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
-def svm_Classify(batch1, batch2, k=59):
+
+
+def svm_Classify (batch1, batch2, k=59):
     """
     训练 SVM 分类器，支持 PCA 降维，接受两个 batch 作为输入
     """
     # 处理 DataLoader 的情况
-    if isinstance(batch1, torch.utils.data.DataLoader):
-        batch1 = next(iter(batch1))
-    if isinstance(batch2, torch.utils.data.DataLoader):
-        batch2 = next(iter(batch2))
+    if isinstance (batch1, torch.utils.data.DataLoader):
+        batch1 = next (iter (batch1))
+    if isinstance (batch2, torch.utils.data.DataLoader):
+        batch2 = next (iter (batch2))
 
     X_train, y_train = batch1
     X_test, y_test = batch2
 
     # 转换为 numpy 数组（如果数据是 PyTorch 张量）
-    if isinstance(X_train, torch.Tensor):
-        X_train = X_train.numpy()
-        X_test = X_test.numpy()
-        y_train = y_train.numpy()
-        y_test = y_test.numpy()
+    if isinstance (X_train, torch.Tensor):
+        X_train = X_train.numpy ()
+        X_test = X_test.numpy ()
+        y_train = y_train.numpy ()
+        y_test = y_test.numpy ()
 
     # 调整形状：展平成 (num_samples, num_features)
-    X_train = X_train.reshape(X_train.shape[0], -1)  # (batch, 784)
-    X_test = X_test.reshape(X_test.shape[0], -1)  # (batch, 784)
+    X_train = X_train.reshape (X_train.shape[0], -1)  # (batch, 784)
+    X_test = X_test.reshape (X_test.shape[0], -1)  # (batch, 784)
 
     # PCA
-    pca = PCA(n_components=k)
-    pca.fit(X_train)
-    X_train_pca = pca.transform(X_train)
-    X_test_pca = pca.transform(X_test)
+    pca = PCA (n_components=k)
+    pca.fit (X_train)
+    X_train_pca = pca.transform (X_train)
+    X_test_pca = pca.transform (X_test)
 
     # 训练 SVM
-    svm_clf = SVC(kernel='rbf')
-    svm_clf.fit(X_train_pca, y_train)
+    svm_clf = SVC (kernel='rbf')
+    svm_clf.fit (X_train_pca, y_train)
 
     # 预测
-    y_pred_train = svm_clf.predict(X_train_pca)
-    y_pred_test = svm_clf.predict(X_test_pca)
+    y_pred_train = svm_clf.predict (X_train_pca)
+    y_pred_test = svm_clf.predict (X_test_pca)
 
-    train_acc = accuracy_score(y_train, y_pred_train)
-    test_acc = accuracy_score(y_test, y_pred_test)
+    train_acc = accuracy_score (y_train, y_pred_train)
+    test_acc = accuracy_score (y_test, y_pred_test)
 
-    print(f"\n======== SVM Classification on Fashion Mnist ========")
-    print(f"Train Accuracy: {train_acc:.4f}")
-    print(f"Test Accuracy: {test_acc:.4f}")
+    print (f"\n======== SVM Classification on Fashion Mnist ========")
+    print (f"Train Accuracy: {train_acc:.4f}")
+    print (f"Test Accuracy: {test_acc:.4f}")
 
-svm_Classify(fashion_train_batches, fashion_test_batches)
+# svm_Classify(fashion_train_batches, fashion_test_batches)
